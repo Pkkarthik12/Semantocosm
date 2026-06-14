@@ -69,4 +69,4 @@ Type anything in the input box—a dream, a diary entry, a technical description
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 ---
-*Created by Gemini CLI - An experiment in unique AI product generation.*
+
