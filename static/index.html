@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semantocosm | Type a thought, spawn a world</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #050505; color: #eee; }
+        #ui { position: absolute; top: 20px; left: 20px; z-index: 100; width: 300px; background: rgba(20, 20, 20, 0.8); padding: 20px; border-radius: 12px; border: 1px solid #444; backdrop-filter: blur(5px); }
+        h1 { margin: 0 0 10px 0; font-size: 24px; color: #00d2ff; }
+        textarea { width: 100%; height: 100px; background: #111; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 6px; box-sizing: border-box; resize: none; margin-bottom: 10px; }
+        button { width: 100%; padding: 10px; background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%); border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; transition: transform 0.1s; }
+        button:active { transform: scale(0.98); }
+        #stats { margin-top: 15px; font-size: 13px; color: #aaa; }
+        .stat-item { display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .loading { display: none; color: #00d2ff; font-weight: bold; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h1>Semantocosm</h1>
+        <p style="font-size: 12px; margin-bottom: 15px;">Enter your thoughts to generate a unique 3D miniature planet.</p>
+        <textarea id="textInput" placeholder="How are you feeling today? Describe a concept or a dream..."></textarea>
+        <button id="spawnBtn">SPAWN WORLD</button>
+        <div id="loading" class="loading">Analyzing Semantics...</div>
+        <div id="stats">
+            <div class="stat-item"><span>Polarity:</span> <span id="stat-polarity">-</span></div>
+            <div class="stat-item"><span>Subjectivity:</span> <span id="stat-subjectivity">-</span></div>
+            <div class="stat-item"><span>Biome:</span> <span id="stat-palette">-</span></div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // Simplex Noise (Minimal Implementation for Terrain)
+        const Grad = [[1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],[1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],[0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]];
+        const p = new Uint8Array(512);
+        for(let i=0; i<256; i++) p[i] = p[i+256] = Math.floor(Math.random() * 256);
+        function noise(x, y, z) {
+            let X = Math.floor(x) & 255, Y = Math.floor(y) & 255, Z = Math.floor(z) & 255;
+            x -= Math.floor(x); y -= Math.floor(y); z -= Math.floor(z);
+            const u = x*x*x*(x*(x*6-15)+10), v = y*y*y*(y*(y*6-15)+10), w = z*z*z*(z*(z*6-15)+10);
+            const A = p[X]+Y, AA = p[A]+Z, AB = p[A+1]+Z, B = p[X+1]+Y, BA = p[B]+Z, BB = p[B+1]+Z;
+            function lerp(t,a,b){return a+t*(b-a)}
+            function dot(g,x,y,z){return g[0]*x+g[1]*y+g[2]*z}
+            return lerp(w, lerp(v, lerp(u, dot(Grad[p[AA]%12], x, y, z), dot(Grad[p[BA]%12], x-1, y, z)),
+                                   lerp(u, dot(Grad[p[AB]%12], x, y-1, z), dot(Grad[p[BB]%12], x-1, y-1, z))),
+                           lerp(v, lerp(u, dot(Grad[p[AA+1]%12], x, y, z-1), dot(Grad[p[BA+1]%12], x-1, y, z-1)),
+                                   lerp(u, dot(Grad[p[AB+1]%12], x, y-1, z-1), dot(Grad[p[BB+1]%12], x-1, y-1, z-1))));
+        }
+
+        // Scene Setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        camera.position.z = 5;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        sunLight.position.set(5, 5, 5);
+        scene.add(sunLight);
+
+        // Stars
+        const starGeometry = new THREE.BufferGeometry();
+        const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.1 });
+        const starVertices = [];
+        for (let i = 0; i < 2000; i++) {
+            const x = (Math.random() - 0.5) * 1000;
+            const y = (Math.random() - 0.5) * 1000;
+            const z = (Math.random() - 0.5) * 1000;
+            starVertices.push(x, y, z);
+        }
+        starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+        const stars = new THREE.Points(starGeometry, starMaterial);
+        scene.add(stars);
+
+        let currentPlanet = null;
+
+        async function createPlanet(params) {
+            if (currentPlanet) scene.remove(currentPlanet);
+
+            const group = new THREE.Group();
+            
+            // Terrain
+            const geometry = new THREE.SphereGeometry(2, 128, 128);
+            const positions = geometry.attributes.position;
+            const colors = [];
+            
+            const roughness = params.roughness;
+            const waterLevel = params.waterLevel;
+            const palette = params.palette;
+
+            const colorA = new THREE.Color();
+            const colorB = new THREE.Color();
+            
+            if (palette === "Lush") {
+                colorA.setHSL(0.3, 0.8, 0.4); // Deep Green
+                colorB.setHSL(0.5, 0.9, 0.6); // Aqua
+            } else if (palette === "Barren") {
+                colorA.setHSL(0.0, 0.7, 0.2); // Dark Red
+                colorB.setHSL(0.1, 0.3, 0.3); // Grayish Brown
+            } else {
+                colorA.setHSL(0.15, 0.5, 0.4); // Earthy
+                colorB.setHSL(0.4, 0.4, 0.5); // Calm Blue
+            }
+
+            for (let i = 0; i < positions.count; i++) {
+                const vec = new THREE.Vector3().fromBufferAttribute(positions, i);
+                const n = noise(vec.x * 0.5, vec.y * 0.5, vec.z * 0.5);
+                const height = n * roughness;
+                
+                vec.normalize().multiplyScalar(2 + Math.max(0, height));
+                positions.setXYZ(i, vec.x, vec.y, vec.z);
+
+                if (height < 0.05 * roughness) {
+                    colors.push(0.1, 0.3, 0.8); // Water
+                } else if (height < 0.15 * roughness) {
+                    colors.push(colorB.r, colorB.g, colorB.b); // Lowland
+                } else {
+                    colors.push(colorA.r, colorA.g, colorA.b); // Highland
+                }
+            }
+            
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            geometry.computeVertexNormals();
+
+            const material = new THREE.MeshStandardMaterial({ 
+                vertexColors: true,
+                roughness: 0.8,
+                metalness: 0.1
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            group.add(mesh);
+
+            // Atmosphere Glow
+            const glowGeo = new THREE.SphereGeometry(2.1, 64, 64);
+            const glowMat = new THREE.MeshBasicMaterial({
+                color: palette === "Lush" ? 0x00ffcc : (palette === "Barren" ? 0xff4400 : 0x0099ff),
+                transparent: true,
+                opacity: 0.15,
+                side: THREE.BackSide
+            });
+            const glow = new THREE.Mesh(glowGeo, glowMat);
+            group.add(glow);
+
+            scene.add(group);
+            currentPlanet = group;
+        }
+
+        // Initialize with a default world
+        createPlanet({ roughness: 0.2, waterLevel: 0.5, palette: "Temperate" });
+
+        // UI Logic
+        const textInput = document.getElementById('textInput');
+        const spawnBtn = document.getElementById('spawnBtn');
+        const loading = document.getElementById('loading');
+
+        spawnBtn.addEventListener('click', async () => {
+            const text = textInput.value;
+            if (!text) return;
+
+            loading.style.display = 'block';
+            spawnBtn.disabled = true;
+
+            try {
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                const data = await response.json();
+                
+                document.getElementById('stat-polarity').innerText = data.parameters.sentiment.polarity.toFixed(2);
+                document.getElementById('stat-subjectivity').innerText = data.parameters.sentiment.subjectivity.toFixed(2);
+                document.getElementById('stat-palette').innerText = data.parameters.palette;
+
+                createPlanet(data.parameters);
+            } catch (err) {
+                console.error(err);
+                alert("Error spawning world. Check console.");
+            } finally {
+                loading.style.display = 'none';
+                spawnBtn.disabled = false;
+            }
+        });
+
+        // Animation Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            if (currentPlanet) {
+                currentPlanet.rotation.y += 0.002;
+            }
+            stars.rotation.y -= 0.0001;
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
