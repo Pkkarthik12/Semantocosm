@@ -2,7 +2,7 @@
 
 **"Type a thought, spawn a world."**
 
-Semantocosm is a unique, never-before-seen AI product that translates abstract human thought into a tangible, procedural 3D environment. By analyzing the semantic and emotional weight of text, Semantocosm generates a unique miniature planet that reflects the "vibe" of your input.
+Semantocosm is a AI product that translates abstract human thought into a tangible, procedural 3D environment. By analyzing the semantic and emotional weight of text, Semantocosm generates a unique miniature planet that reflects the "vibe" of your input.
 
 ![Semantocosm Concept](https://img.shields.io/badge/AI-NLP-blueviolet?style=for-the-badge)
 ![Three.js](https://img.shields.io/badge/3D-Three.js-black?style=for-the-badge)
